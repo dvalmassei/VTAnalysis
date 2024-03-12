@@ -9,7 +9,7 @@ pip install pylandau
 ```
 
 ## Usage
-The library file has a `main` function which shows one example of how the program opporates. It can be run from the command line:
+The library file has a `main` function which shows one example usage. It can be run from the command line:
 ```
 python analysis_lib.py
 ```
