@@ -17,6 +17,6 @@ This creates 3 plots: the signals from WaveDump, raw histograms, final plot w/ r
 
 The GUI can be started from the command line with:
 ```
-python analysisGui_vs.py
+python analysisGui_v2.py
 ```
 Fill in the requested fields, then `analysis_lib.main` will run with the specified values.
