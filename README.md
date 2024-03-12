@@ -7,6 +7,7 @@ Python scripts to analyze cosmic telescope data
 ```
 pip install pylandau
 ```
+Note: it appears that pylandau is built with an old version of numpy, so warnings are supressed in the example
 
 ## Usage
 The library file has a `main` function which shows one example usage. It can be run from the command line:
