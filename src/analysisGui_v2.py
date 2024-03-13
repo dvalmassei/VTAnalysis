@@ -60,7 +60,7 @@ class AnalysisApp(QWidget):
 
         # Other parameters
         params = {
-            'Attenuation/Gain': self.atten,
+            'Attenuation': self.atten,
             'Trigger Threshold': self.trigger_threshold,
             'Signal Threshold': self.signal_threshold,
             'Number of Bins': self.nbins,
