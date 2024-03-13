@@ -144,6 +144,7 @@ def pedestal_fit(hists,bins,noise_channel,charge,mean):
 
 def main(data_folder, runs, data_channels, noise_channel, atten, triggerThreshold, signalThreshold, nBins, histEndpoint):
     
+    plt.style.use('seaborn-v0_8')
     all_channels = data_channels + noise_channel
     signals = read_signals(data_folder, runs, all_channels)
 
@@ -170,15 +171,16 @@ def main(data_folder, runs, data_channels, noise_channel, atten, triggerThreshol
     pedbins = (pedbins[:-1] + pedbins[1:]) /2
     
     mean, rms, std = calculate_stats(all_channels, charge)
+    coeffs, resLangau, r_squared, failed_fit_channels = fit(hists,bins,data_channels,charge,mean)
+    ped_coeffs,_,_,_ = pedestal_fit(pedhist, pedbins, noise_channel, charge[-1], mean[-1])
 
+    print(f'Number of Events above signal threshold: {sum(hists[0])}')
     print(f'mean: {mean}')
     print(f'rms: {rms}')
     print(f'std: {std}')
     print(f'rms/mean: {rms/mean}')
     print(f'std/mean: {std/mean}')
-    
-    coeffs, resLangau, r_squared, failed_fit_channels = fit(hists,bins,data_channels,charge,mean)
-    ped_coeffs,_,_,_ = pedestal_fit(pedhist, pedbins, noise_channel, charge[-1], mean[-1])
+    print(f'r_squared: {r_squared}') 
     
     for i in range(len(hists)):    
         plt.step(bins[i], hists[i])
@@ -187,8 +189,7 @@ def main(data_folder, runs, data_channels, noise_channel, atten, triggerThreshol
     plt.step(pedbins, pedhist)
     plt.plot(pedbins, gauss(pedbins, *ped_coeffs))
         
-    plt.show()
-    print(f'r_squared: {r_squared}')   
+    plt.show()  
 
     fig, axis = plt.subplots(2, 1, height_ratios=[4, 1], sharex=True, figsize=(12, 8))
     
