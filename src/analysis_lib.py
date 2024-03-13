@@ -182,15 +182,15 @@ def main(data_folder, runs, data_channels, noise_channel, atten, triggerThreshol
     print(f'std/mean: {std/mean}')
     print(f'r_squared: {r_squared}') 
     
+    '''
     for i in range(len(hists)):    
         plt.step(bins[i], hists[i])
         plt.plot(bins[i], pylandau.langau(bins[i], *coeffs[i]))
         
     plt.step(pedbins, pedhist)
     plt.plot(pedbins, gauss(pedbins, *ped_coeffs))
-        
     plt.show()  
-
+'''
     fig, axis = plt.subplots(2, 1, height_ratios=[4, 1], sharex=True, figsize=(12, 8))
     
     for i in range(len(hists)):
