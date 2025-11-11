@@ -36,23 +36,26 @@ def read_signals(data_folder, runs, channels):
     print('Loading data. This could take a couple minutes. Please wait...')
 
     dfs = []
-    dfs.append(pd.read_csv(data_folder + f'/{runs[0]}/TR_0_0.txt', header=None))
+    dfs.append(pd.read_csv(data_folder + f'/{runs[0]}/TR_0_0.txt', header=None,dtype=float,skiprows=1))
     for ch in channels:
-        dfs.append(pd.read_csv(data_folder + f'/{runs[0]}/wave_{ch}.txt', header=None))
+        dfs.append(pd.read_csv(data_folder + f'/{runs[0]}/wave_{ch}.txt', header=None,dtype =float,skiprows=1))
     
     if len(runs) > 1:
-        for i in range(len(runs) - 1):
+        print('more than one run')
+        for i in range(len(runs)-1):
             dfs[0] = pd.concat([dfs[0], pd.read_csv(data_folder + f'/{runs[i+1]}/TR_0_0.txt', header= None)])
-            for ch in channels:
+            for ch in range(len(channels)):
                 dfs[ch+1] = pd.concat([dfs[ch+1],pd.read_csv(data_folder + f'/{runs[i+1]}/wave_{ch}.txt',header = None)])    
             
     print('Data loaded!')
 
-    signals = np.array(dfs)/50/4096
+    maxlen = min([len(dfs[i]) for i in range(len(dfs))])
+    
+    signals = np.array([dfs[i][:10000000] for i in range(len(dfs))])/4096/50
     return signals
 
 def calculate_offsets(signals, channels):
-    offsets = [np.mean(signals[ch][:300]) for ch in range(len(channels)+1)]
+    offsets = [np.mean(signals[ch][:100]) for ch in range(len(channels)+1)]
     return offsets 
 
 def find_events(trigger, threshold, offset):
@@ -69,14 +72,14 @@ def find_events(trigger, threshold, offset):
 
 def integrate_signals(channels, events, signalThreshold, signals, offsets, atten):
     charge = [np.zeros(len(events)) for _ in range(len(channels))]
-
+    
     for i in range(len(events)):
         start_index = events[i]
-        for ch in channels[:-1]:
-            if (max(offsets[ch+1] - signals[ch+1][start_index:start_index + 1000])> signalThreshold):
-                charge[ch][i] = sum(offsets[ch+1] - signals[ch+1][start_index:start_index + 1000]) / (5 * 10E9) * 1E12 / atten
-                
-        charge[-1][i] = sum(offsets[-1] - signals[-1][start_index:start_index + 1000]) / (5 * 10E9) * 1E12 / atten
+        offsets = [np.mean(signals[ch+1][start_index-60:start_index]) for ch in range(len(channels))]
+        for ch in range(len(channels)):
+            if (max(offsets[ch] - signals[ch+1][start_index:start_index + 800])> signalThreshold):
+                charge[ch][i] = sum(offsets[ch] - signals[ch+1][start_index:start_index + 800]) / (5.12*1E9) * 1E12 / atten
+                #charge[-1][i] = sum(offsets[-1] - signals[-1][start_index:start_index + 1000]) / (5*1E9) * 1E12 / atten
         
     print('Finished processing signals!')
     return charge
@@ -97,7 +100,7 @@ def histogram_charges(charge, channels, histEndpoint, nBins):
     hists = []
     bins = []
     for i in range(len(channels)):
-        hist0, bins0 = np.histogram(charge[i][charge[i] != 0], bins=nBins, range=(-50, histEndpoint))
+        hist0, bins0 = np.histogram(charge[i][charge[i] != 0], bins=nBins, range=(-10 , histEndpoint))
         hists.append(hist0)
         bins.append((bins0[:-1] + bins0[1:]) /2) #calculate bin centers
     
@@ -164,20 +167,22 @@ def main(data_folder, runs, data_channels, noise_channel, atten, triggerThreshol
     events = find_events(trigger,triggerThreshold,offsets[0])
     print(f'Number of Events: {len(events)}')
     
-    signalThreshold /= 4096 * 50
+    
     charge = np.array(integrate_signals(all_channels, events, signalThreshold,signals, offsets, atten))
-
+    print(f'Max Charge: {np.max(charge)}')
+    
     hists, bins = histogram_charges(charge,data_channels,histEndpoint, nBins)
     pedhist, pedbins = np.histogram(charge[-1], bins=nBins, range=(-2, 2))
     pedbins = (pedbins[:-1] + pedbins[1:]) /2
-    '''
+    
     histzip = zip(bins[0],hists[0],hists[1])
-    with open('test.csv', 'w', encoding="ISO-8859-1", newline='') as myfile:
+    with open('chargeHistogram.csv', 'w', encoding="ISO-8859-1", newline='') as myfile:
       wr = csv.writer(myfile)
       wr.writerow(("charge (pC)","ch.0","ch.1"))
       wr.writerows(histzip)
     myfile.close()
-    
+    ''
+    '''
     histzip = zip(bins[-1],hists[-1])
     with open('pedHist.csv', 'w', encoding="ISO-8859-1", newline='') as myfile:
       wr = csv.writer(myfile)
@@ -186,8 +191,8 @@ def main(data_folder, runs, data_channels, noise_channel, atten, triggerThreshol
     myfile.close()
     '''
     mean, rms, std = calculate_stats(all_channels, charge)
-    coeffs, resLangau, r_squared, failed_fit_channels = fit(hists,bins,data_channels,charge,mean)
-    ped_coeffs,_,_,_ = pedestal_fit(pedhist, pedbins, noise_channel, charge[-1], mean[-1])
+    #coeffs, resLangau, r_squared, failed_fit_channels = fit(hists,bins,data_channels,charge,mean)
+    #ped_coeffs,_,_,_ = pedestal_fit(pedhist, pedbins, noise_channel, charge[-1], mean[-1])
 
     print(f'Number of Events above signal threshold: {sum(hists[0])}')
     print(f'mean: {mean}')
@@ -195,8 +200,8 @@ def main(data_folder, runs, data_channels, noise_channel, atten, triggerThreshol
     print(f'std: {std}')
     print(f'rms/mean: {rms/mean}')
     print(f'std/mean: {std/mean}')
-    print(f'r_squared: {r_squared}') 
-    print(f'coeffs: {coeffs}') 
+    #print(f'r_squared: {r_squared}') 
+    #print(f'coeffs: {coeffs}') 
     '''
     for i in range(len(hists)):    
         plt.step(bins[i], hists[i])
@@ -206,54 +211,57 @@ def main(data_folder, runs, data_channels, noise_channel, atten, triggerThreshol
     plt.plot(pedbins, gauss(pedbins, *ped_coeffs))
     plt.show()  
 '''
-    fig, axis = plt.subplots(2, 1, height_ratios=[4, 1], sharex=True, figsize=(12, 8))
+    fig, axis = plt.subplots(figsize=(12, 8))
     
     for i in range(len(hists)):
-        if i in failed_fit_channels:
-            axis[0].step(bins[i], hists[i], linewidth=1, label=f'ch. {data_channels[i]}, res = {std[i]/mean[i]:.4f}')
+        axis.step(bins[i], hists[i], linewidth=1, label=f'ch. {data_channels[i]}, res = {std[i]/mean[i]:.4f}')
+    '''
         else:
             axis[0].step(bins[i], hists[i], linewidth=1, label=f'ch. {data_channels[i]}, std/mean = {std[i]/mean[i]:.4f}')
             axis[0].plot(bins[i], pylandau.langau(bins[i], *coeffs[i]), label = f'ch. {data_channels[i]} fit, $r^2 = {r_squared[i]:.4f}$')
             axis[1].scatter(bins[i], resLangau[i], s=3, label=f'ch. {data_channels[i]}')
-
+    '''
+    
     if len(noise_channel) > 0:
-        axis[0].step(pedbins,pedhist/2,linewidth=1,label=f'ch. {noise_channel[0]} (noise)') # divide by 2 so we can still see data histogram
-    axis[0].legend(fontsize='medium', frameon=True)
-    axis[0].set_ylabel('# events', fontsize='medium', labelpad=2.0)
-    axis[0].set_title(runs)
-
-    axis[1].legend(fontsize='small', frameon=True)
-    axis[1].set_ylabel('residuals', fontsize='medium', labelpad=2.0)
-    axis[1].set_xlabel('pC', fontsize='medium', labelpad=2.0)
+        axis.step(pedbins,pedhist/2,linewidth=1,label=f'ch. {noise_channel[0]} (noise)') # divide by 2 so we can still see data histogram
+    axis.legend(fontsize='medium', frameon=True)
+    axis.set_ylabel('# events', fontsize='medium', labelpad=2.0)
+    axis.set_xlabel('pC')
+    axis.set_title(runs)
+    #axis.set_yscale('log')
+    #plt.ylim((0.9,50))
 
     plt.show()
     
-    peak_charge = [coeffs[i][0] - mean[-1] for i in range(len(data_channels))]
-    print(f'Peak Charge: {peak_charge}')
     
+    #peak_charge = [coeffs[i][0] - mean[-1] for i in range(len(data_channels))]
+    #print(f'Peak Charge: {peak_charge}')
     
-    plt.hist(sum(charge[:-1]),bins=100,range=(0,60))
+    '''
+    plt.hist(sum(charge[:-1]),bins=100,range=(0,20))
     plt.show()
     '''
+    
     chargezip = zip(charge[0],charge[1])
     with open('charge.csv', 'w', encoding="ISO-8859-1", newline='') as myfile:
       wr = csv.writer(myfile)
-      wr.writerow(("ch.0","ch.1"))
+      wr.writerow(('ch.0','ch.1'))
       wr.writerows(chargezip)
     myfile.close()
-    '''
+    
 
 if __name__ =='__main__':
     # Example usage:
     data_folder = '../../data'
-    runs = ['802_spe_800V_06122024_1']  # Example list of runs 'sam_012224_0','sam_012324_0','sam_012524_0','sam_012624_0'
-    data_channels = [0]
+    runs = ['SAM_001_11102025_002'] #Example list of runs 'sam_012224_0','sam_012324_0','sam_012524_0','sam_012624_0'
+    data_channels = [0,1]
     noise_channel = []
-    atten = 1.0
-    triggerThreshold = 500
-    signalThreshold = 0
-    nBins = 64
-    histEndpoint = 15
+    
+    atten = 1.0 #[Amplification]*[Attenuation Factor] #Assume 1.0 Attenuation Indefinetly 
+    triggerThreshold = 100
+    signalThreshold = 0.000 #0.001 #in Amps
+    nBins = 128
+    histEndpoint = 500
     warnings.simplefilter("ignore")
     
     main(data_folder, runs, data_channels, noise_channel, atten, triggerThreshold, signalThreshold, nBins, histEndpoint)
