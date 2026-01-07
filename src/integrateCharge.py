@@ -9,7 +9,7 @@ Created on Wed Mar  6 16:48:18 2024
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import pylandau
+from scipy.stats import landau as pylandau
 from scipy.optimize import curve_fit
 import warnings
 import csv
@@ -25,7 +25,7 @@ def gaussFit(x, y, A, x0, sigma):
     return coeff, pcov
 
 def langauFit(x, y, mpv, sigma, eta, A):
-    coeff, pcov = curve_fit(pylandau.langau, x, y,
+    coeff, pcov = curve_fit(pylandau.langauss, x, y,
                         absolute_sigma=True,
                         p0=(mpv, sigma, eta, A),                    
                         bounds=(-2.0,1000.0))
@@ -48,8 +48,6 @@ def read_signals(data_folder, runs, channels):
                 dfs[ch+1] = pd.concat([dfs[ch+1],pd.read_csv(data_folder + f'/{runs[i+1]}/wave_{ch}.txt',header = None)])    
             
     print('Data loaded!')
-
-    maxlen = min([len(dfs[i]) for i in range(len(dfs))])
     
     signals = np.array([dfs[i][:10000000] for i in range(len(dfs))])/4096/50
     return signals
@@ -119,7 +117,7 @@ def fit(hists,bins,channels,charge,means):
             coeff,pcov = langauFit(bins[i], hists[i], means[i]/2, np.std(charge[i])/2, 0.1, np.max(hists[i]))
             coeffs.append(coeff)
             pcovs.append(pcov)
-            resLangau.append(pylandau.langau(bins[i], *coeffs[i]) - hists[i])
+            resLangau.append(pylandau.langauss(bins[i], *coeffs[i]) - hists[i])
             ss_resLangau.append(np.sum(np.array(resLangau[i]) **2))
             ss_tot.append(np.sum((hists[i] - np.mean(hists[i]))**2))
             
@@ -252,8 +250,8 @@ def main(data_folder, runs, data_channels, noise_channel, atten, triggerThreshol
 
 if __name__ =='__main__':
     # Example usage:
-    data_folder = '../../data'
-    runs = ['SAM_001_11102025_002'] #Example list of runs 'sam_012224_0','sam_012324_0','sam_012524_0','sam_012624_0'
+    data_folder = '../data'
+    runs = ['sam_012224_0'] #Example list of runs 'sam_012224_0','sam_012324_0','sam_012524_0','sam_012624_0'
     data_channels = [0,1]
     noise_channel = []
     
